@@ -3,7 +3,6 @@ require("dotenv").config();
 const fs = require("fs");
 const axios = require("axios");
 
-// Define an array of subreddit objects with their corresponding thread IDs
 const subreddits = [
     { name: "r/SalC1", threadId: "1196236674439589998" },
     { name: "r/2b2t_Uncensored", threadId: "1196236581850329200" },
@@ -60,7 +59,7 @@ function GetImageUrl(post) {
 	}
 }
 
-async function ProcessPost(post, subreddit) {
+async function ProcessPost(post, threadId) {
     let imageUrl = GetImageUrl(post);
 
     let embed = {
@@ -70,17 +69,16 @@ async function ProcessPost(post, subreddit) {
         color: 0xFF5700,
         author: {
             name: `u/${post.author}`,
-            url: `https://www.reddit.com/user/${post.author}`,
+            url: `https://www.reddit.com/user/${post.author}`
         },
         image: imageUrl ? {
-            url: imageUrl,
-        } : null,
+            url: imageUrl
+        } : null
     };
 
     try {
-        // Append '?thread_id=' to the webhook URL
-        await axios.post(`https://discordapp.com/api/webhooks/${process.env.WEBHOOK_ID}/${process.env.WEBHOOK_TOKEN}?thread_id=${subreddit.threadId}`, {
-            embeds: [embed],
+        await axios.post(`https://discordapp.com/api/webhooks/${process.env.WEBHOOK_ID}/${process.env.WEBHOOK_TOKEN}?${threadId}`, {
+            embeds: [embed]
         });
         await sleep(2000);
     } catch (ex) {
@@ -91,40 +89,41 @@ async function ProcessPost(post, subreddit) {
 async function main() {
     let response;
     try {
-        // Iterate through each subreddit
         for (const subreddit of subreddits) {
             response = await axios.get(`https://www.reddit.com/${subreddit.name}/new.json`);
             let posts = response.data.data.children;
 
-            if (!lastPost[subreddit.name]) {
-                lastPost[subreddit.name] = { date: posts[0].data.created, id: posts[0].data.name };
-                continue;
+            if (!lastPost) {
+                lastPost = { date: posts[0].data.created, id: posts[0].data.name };
+                return setTimeout(main, 60 * 1000);
             }
 
             let toSend = [];
 
             for (let post of posts) {
-                if (post.data.name === lastPost[subreddit.name].id || post.data.created <= lastPost[subreddit.name].date) {
+                if (post.data.name === lastPost.id || post.data.created <= lastPost.date) {
                     break;
                 }
                 toSend.push(post.data);
             }
 
-            if (toSend.length > 0) {
-                for (let post of toSend.reverse()) {
-                    console.log(`Processing post for ${subreddit.name}`, post.name, "-", post.title);
-                    await ProcessPost(post, subreddit);
-                }
+            if (toSend.length === 0)
+                return setTimeout(main, 60 * 1000);
 
-                lastPost[subreddit.name] = { date: toSend.at(-1).created, id: toSend.at(-1).name };
+            for (let post of toSend.reverse()) {
+                console.log("Processing post", post.name, "-", post.title);
+                await ProcessPost(post, subreddit.threadId);
             }
+
+            lastPost = { date: toSend.at(-1).created, id: toSend.at(-1).name };
+            fs.writeFileSync("last.dat", JSON.stringify(lastPost));
+
+            await sleep(2000); 
         }
     } catch (ex) {
         console.error("Got error", ex?.message || ex);
+        return setTimeout(main, 60 * 1000);
     }
 
-    fs.writeFileSync("last.dat", JSON.stringify(lastPost));
     setTimeout(main, 60 * 1000);
 }
-
-main();

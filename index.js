@@ -23,7 +23,6 @@ function sleep(ms) {
     });
 }
 
-
 function GetImageUrl(post) {
 	if(post.media_metadata) {
 		let id;
@@ -59,11 +58,12 @@ function GetImageUrl(post) {
 	}
 }
 
+
 async function ProcessPost(post, threadId) {
     let imageUrl = GetImageUrl(post);
 
     let embed = {
-        title: `${subreddit.name} - ${post.title}`.substring(0, 256),
+        title: `${post.subreddit} - ${post.title}`.substring(0, 256), // Correction here
         description: post.selftext.substring(0, 512),
         url: `https://www.reddit.com${post.permalink}`,
         color: 0xFF5700,
@@ -118,7 +118,7 @@ async function main() {
             lastPost = { date: toSend.at(-1).created, id: toSend.at(-1).name };
             fs.writeFileSync("last.dat", JSON.stringify(lastPost));
 
-            await sleep(2000); 
+            await sleep(2000);
         }
     } catch (ex) {
         console.error("Got error", ex?.message || ex);
@@ -127,3 +127,5 @@ async function main() {
 
     setTimeout(main, 60 * 1000);
 }
+
+main();

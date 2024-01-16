@@ -63,7 +63,7 @@ async function ProcessPost(post, threadId) {
     let imageUrl = GetImageUrl(post);
 
     let embed = {
-        title: `${post.subreddit} - ${post.title}`.substring(0, 256), // Correction here
+        title: `${post.subreddit} - ${post.title}`.substring(0, 256),
         description: post.selftext.substring(0, 512),
         url: `https://www.reddit.com${post.permalink}`,
         color: 0xFF5700,
@@ -80,9 +80,10 @@ async function ProcessPost(post, threadId) {
         await axios.post(`https://discordapp.com/api/webhooks/${process.env.WEBHOOK_ID}/${process.env.WEBHOOK_TOKEN}?${threadId}`, {
             embeds: [embed]
         });
+        console.log("Successfully sent post", post.name, "-", post.title);
         await sleep(2000);
     } catch (ex) {
-        console.error("Failed to send post", embed, "because", ex.response.data);
+        console.error("Failed to send post", post.name, "-", post.title, "because", ex.response?.data || ex.message);
     }
 }
 
@@ -95,6 +96,7 @@ async function main() {
 
             if (!lastPost) {
                 lastPost = { date: posts[0].data.created, id: posts[0].data.name };
+                console.log("Initial run. Setting lastPost:", lastPost);
                 return setTimeout(main, 60 * 1000);
             }
 
@@ -107,8 +109,10 @@ async function main() {
                 toSend.push(post.data);
             }
 
-            if (toSend.length === 0)
+            if (toSend.length === 0) {
+                console.log("No new posts to send. Waiting...");
                 return setTimeout(main, 60 * 1000);
+            }
 
             for (let post of toSend.reverse()) {
                 console.log("Processing post", post.name, "-", post.title);
@@ -122,9 +126,11 @@ async function main() {
         }
     } catch (ex) {
         console.error("Got error", ex?.message || ex);
+        console.log("Retrying after 60 seconds...");
         return setTimeout(main, 60 * 1000);
     }
 
+    console.log("Finished processing. Waiting for the next run...");
     setTimeout(main, 60 * 1000);
 }
 
